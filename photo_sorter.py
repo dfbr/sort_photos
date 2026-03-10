@@ -11,6 +11,7 @@ Videos autoplay muted in a loop until you make a choice.
 import os
 import sys
 import shutil
+import subprocess
 from datetime import datetime
 import tempfile
 from pathlib import Path
@@ -37,6 +38,7 @@ class PhotoSorter:
     
     # Supported video extensions
     VIDEO_EXTENSIONS = {'.mov', '.mp4', '.mpg', '.avi', '.m4v', '.mkv', '.wmv'}
+    ORIENTATION_CW_MAP = {1: 6, 2: 7, 3: 8, 4: 5, 5: 2, 6: 3, 7: 4, 8: 1}
     
     def __init__(self, photos_dir: str, keep_dir: str = "keep"):
         """
@@ -66,6 +68,9 @@ class PhotoSorter:
 
         # Autoplay is enabled by default. Set PHOTO_SORTER_AUTOPLAY_VIDEOS=0 to force static preview mode.
         self.autoplay_videos = os.environ.get("PHOTO_SORTER_AUTOPLAY_VIDEOS", "1") == "1"
+        self.exiftool_path = shutil.which("exiftool")
+        if not self.exiftool_path:
+            print("Warning: exiftool not found. Lossless image rotation is disabled to prevent quality loss.")
         
     def find_all_photos(self) -> List[Path]:
         """
@@ -389,31 +394,64 @@ class PhotoSorter:
             print(f"Error restoring {original_path} from keep: {e}")
             return False
 
+    def _orientation_after_cw_rotation(self, current_orientation: int, rotation_steps: int) -> int:
+        """Compute EXIF orientation after clockwise 90-degree rotations."""
+        steps = rotation_steps % 4
+        orientation = current_orientation if current_orientation in self.ORIENTATION_CW_MAP else 1
+        for _ in range(steps):
+            orientation = self.ORIENTATION_CW_MAP.get(orientation, 1)
+        return orientation
+
     def rotate_and_save_image(self, source_path: Path, dest_path: Path, rotation_steps: int) -> bool:
-        """Rotate an image and save it to destination."""
+        """Keep image quality by moving file and updating EXIF orientation metadata only."""
+        steps = rotation_steps % 4
+        if steps == 0:
+            try:
+                shutil.move(str(source_path), str(dest_path))
+                return True
+            except Exception as e:
+                print(f"Error moving image {source_path}: {e}")
+                return False
+
+        if not self.exiftool_path:
+            print("Error: exiftool not found; cannot apply lossless image rotation without re-encoding")
+            return False
+
         try:
+            current_orientation = 1
             with Image.open(source_path) as image:
-                steps = rotation_steps % 4
-                if steps == 1:
-                    rotated = image.rotate(-90, expand=True)
-                elif steps == 2:
-                    rotated = image.rotate(180, expand=True)
-                elif steps == 3:
-                    rotated = image.rotate(90, expand=True)
-                else:
-                    rotated = image.copy()
+                exif = image.getexif()
+                current_orientation = int(exif.get(274, 1))
 
-                save_kwargs = {}
-                exif = image.info.get("exif")
-                if exif is not None:
-                    save_kwargs["exif"] = exif
+            new_orientation = self._orientation_after_cw_rotation(current_orientation, steps)
+            shutil.move(str(source_path), str(dest_path))
 
-                rotated.save(dest_path, **save_kwargs)
+            cmd = [
+                self.exiftool_path,
+                "-overwrite_original",
+                "-n",
+                f"-Orientation={new_orientation}",
+                str(dest_path),
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                err = result.stderr.strip() or result.stdout.strip() or "unknown error"
+                print(f"Error applying lossless rotation to {dest_path}: {err}")
+                # Restore original location on failure.
+                try:
+                    shutil.move(str(dest_path), str(source_path))
+                except Exception:
+                    pass
+                return False
 
-            source_path.unlink()
             return True
         except Exception as e:
             print(f"Error rotating image {source_path}: {e}")
+            if dest_path.exists() and not source_path.exists():
+                try:
+                    shutil.move(str(dest_path), str(source_path))
+                except Exception:
+                    pass
             return False
 
     def rotate_and_save_video(self, source_path: Path, dest_path: Path, rotation_steps: int) -> bool:

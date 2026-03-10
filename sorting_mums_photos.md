@@ -32,6 +32,8 @@ I don't know what it was that had changed the metadata, perhaps being arranged i
 
 ## Getting rid of duplicates based on content (ignoring exif)
 
+So, if the metadata is getting in the way of a simple hash calculation of each photo, I guess I need to compare just the content part of each photo and not the metadata. Off to copilot again to ask it to do this. Results are... slow. Copilot, please paralellise this workload and: bingo! 
+
 ## Reviewing photos
 
 ## Getting the best of a moment

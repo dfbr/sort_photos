@@ -39,6 +39,20 @@ To force static-preview mode (optional):
 PHOTO_SORTER_AUTOPLAY_VIDEOS=0 python photo_sorter.py
 ```
 
+### EXIF Burst Reviewer
+
+To review similar shots taken close together by EXIF capture time:
+
+```bash
+venv/bin/python exif_burst_reviewer.py --photos-dir photos
+```
+
+Optional: adjust the grouping window (default is 10 seconds):
+
+```bash
+venv/bin/python exif_burst_reviewer.py --photos-dir photos --window-seconds 15
+```
+
 ## Controls
 
 When viewing each photo or video, you have these options:
@@ -49,6 +63,19 @@ When viewing each photo or video, you have these options:
 - **R** - Rotate the current media 90° clockwise (can be pressed multiple times)
 - **U** - Undo the last decision (multi-level - can undo delete, keep, or skip)
 - **Q** or **ESC** - Quit and finalize all deletions
+
+EXIF Burst Reviewer controls:
+
+- **Click thumbnail** - Toggle selection
+- **1-9, 0** - Toggle selection by index (0 maps to item 10)
+- **D** - Mark selected photos for deletion (deferred until quit)
+- **K** - Keep selected photos (records decision, leaves files in place)
+- **R** - Rotate all photos in group 90° clockwise (saved if kept)
+- **N** or **Spacebar** - Next group with no deletion
+- **U** - Undo last decision and return to that group
+- **A** - Select all photos in current group
+- **C** - Clear selection
+- **Q** or **ESC** - Quit and finalize marked deletions
 
 ## Features
 
@@ -87,3 +114,4 @@ All required packages have been installed:
 - pillow (for image loading)
 - pillow-heif (for HEIC/HEIF support)
 - numpy (image processing)
+- exiftool (lossless metadata-based rotation without image re-encoding)
