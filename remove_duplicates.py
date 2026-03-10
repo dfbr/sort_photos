@@ -290,6 +290,8 @@ class DuplicateRemover:
     
     def print_summary(self, dry_run: bool = False) -> None:
         """Print summary statistics."""
+        avg_time_per_photo = (self.total_time / self.total_files) if self.total_files else 0.0
+
         print("\n" + "="*70)
         print("SUMMARY")
         print("="*70)
@@ -308,6 +310,7 @@ class DuplicateRemover:
         print(f"  File scanning:                 {self.scan_time:.1f}s")
         print(f"  Hash calculation:              {self.hash_time:.1f}s")
         print(f"  Total time:                    {self.total_time:.1f}s")
+        print(f"  Mean time per photo:           {avg_time_per_photo * 1000:.2f} ms ({avg_time_per_photo:.4f}s)")
         print("="*70)
 
 
@@ -336,7 +339,7 @@ def main():
     parser.add_argument(
         "--workers",
         type=int,
-        default=None,
+        default=10,
         help=f"Number of parallel workers for hashing (default: {cpu_count()} - your CPU count)"
     )
     
